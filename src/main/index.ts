@@ -67,6 +67,7 @@ import { ControlRegistry } from './control';
 import { WorkerWakeWatchdog, type WorkerWakeFacts } from './workerWake';
 import { inboxNudgeText } from '../shared/hiveNudge';
 import { resolveGodName } from '../shared/godIdentity';
+import { selectOrphansToArchive } from '../shared/orphanedAgents';
 import { fetchHireManifest, readHireManifestFiles } from './hire';
 import { parseHireDeepLink, type HireManifest } from '../shared/hire';
 import { ClosingTimeController } from './closingTime';
@@ -74,6 +75,7 @@ import {
   argsWithAutoModeFlag,
   inferAgentProvider,
   isClaudeProvider,
+  isPtylessProvider,
   nonInteractiveEnvForProvider,
   providerPreset,
   installInfoForProvider,
@@ -907,10 +909,8 @@ function archiveOrphanedAgents(): void {
   if (!hive.enabled()) return;
   try {
     const reg = hive.registry();
-    for (const [id, a] of Object.entries(reg.agents)) {
-      if (a.archived) continue;
-      if (id === reg.godId) continue;        // god is never archived
-      if (ptyForAgent(id)) continue;         // has a live PTY → genuinely active
+    // god is never archived; a PTY-less (lab) agent is never an orphan; see selectOrphansToArchive.
+    for (const id of selectOrphansToArchive(reg.agents, reg.godId, (agentId) => !!ptyForAgent(agentId))) {
       hive.setArchived(id, true);            // stale archived:false orphan → archive
       console.log('[migration] archived orphaned agent (no live PTY):', id);
     }
@@ -2631,6 +2631,8 @@ async function spawnAgentCore(opts: AgentSpawnOptions, owner: Electron.WebConten
   // record and downstream provider-aware steps agree on one value.
   const provider = inferAgentProvider(opts.command, opts.provider ?? opts.hive?.provider);
   const claudeProvider = isClaudeProvider(provider);
+  // A lab agent has no terminal: it is registered through the lab control server, never spawned.
+  if (isPtylessProvider(provider)) return { ok: false, error: 'the lab provider has no terminal process to spawn' };
   opts.provider = provider;
   if (opts.hive) opts.hive = { ...opts.hive, provider };
   // Activation-funnel entry (v0.4.6): every spawn REQUEST, so (attempted − spawned)

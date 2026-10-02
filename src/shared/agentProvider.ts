@@ -34,7 +34,8 @@ export type AgentProvider =
   | 'pi'
   | 'copilot'
   | 'cursor'
-  | 'custom';
+  | 'custom'
+  | 'lab';
 
 /** Structured descriptor for how a NON-hiveAware provider gets hive lifecycle
  *  events (live status + Stop→inbox-drain + cost), introduced alongside the legacy
@@ -577,6 +578,37 @@ export const AGENT_PROVIDER_PRESETS: AgentProviderPreset[] = [
   }
 ];
 
+/**
+ * The `lab` provider: an agent that has NO terminal process. It is a row in the hive registry that an
+ * external driver (the research lab's orchestration loop, over the lab control server) animates, so it
+ * still gets a floor avatar, status, cost and context gauges and a kanban assignee, but there is no CLI
+ * to spawn, no PTY to type into and no Claude-only identity injection.
+ *
+ * Deliberately NOT a member of AGENT_PROVIDER_PRESETS: that list feeds the Add/Edit Agent pickers, the
+ * engine catalog and the engine-availability probe, and "Lab" is not something a person hires from a
+ * menu. `providerPreset('lab')` still resolves it, so every lookup keeps working.
+ *
+ * `canReceiveInbox` is true so the router writes mail into the agent's inbox/ like it does for Claude
+ * (no terminal work-order handoff, no bounce to the god); the renderer's wake loop only visits agents
+ * that own a PTY, so nothing ever types into a lab agent.
+ */
+export const LAB_PROVIDER_PRESET: AgentProviderPreset = {
+  id: 'lab',
+  label: 'Lab (no terminal)',
+  defaultCommand: '',
+  commandGroups: [],
+  autoModeFlag: '',
+  supportsModel: false,
+  autoFlag: '',
+  hiveAware: false,
+  canReceiveInbox: true
+};
+
+/** True for a provider that runs without a terminal process (today: only `lab`). */
+export function isPtylessProvider(provider: AgentProvider | undefined): boolean {
+  return provider === 'lab';
+}
+
 export function isAgentProvider(value: unknown): value is AgentProvider {
   return (
     value === 'claude' ||
@@ -591,7 +623,8 @@ export function isAgentProvider(value: unknown): value is AgentProvider {
     value === 'pi' ||
     value === 'copilot' ||
     value === 'cursor' ||
-    value === 'custom'
+    value === 'custom' ||
+    value === 'lab'
   );
 }
 
@@ -600,6 +633,7 @@ export function normalizeAgentProvider(value: unknown): AgentProvider | undefine
 }
 
 export function providerPreset(provider: AgentProvider): AgentProviderPreset {
+  if (provider === 'lab') return LAB_PROVIDER_PRESET;
   return AGENT_PROVIDER_PRESETS.find((p) => p.id === provider) ?? AGENT_PROVIDER_PRESETS[0];
 }
 
