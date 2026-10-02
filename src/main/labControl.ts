@@ -25,7 +25,7 @@ import { join } from 'node:path';
 import type { LabMode } from '../shared/labMode';
 import type { LabGateState, LabPhase, LabStateView } from '../shared/labProgress';
 import {
-  validateAgentSpec, validateApprove, validateBoard, validateCost, validateGate, validateLog, validateMessage,
+  validateAgentFile, validateAgentSpec, validateApprove, validateBoard, validateCost, validateGate, validateLog, validateMessage,
   validatePause, validateProgress, validateStart, validateStatus, validateTask, validateTaskPatch,
   type LabAgentSpec, type LabCost, type LabStatus, type Validated
 } from '../shared/labControlProtocol';
@@ -45,6 +45,7 @@ export const LAB_ROUTES: ReadonlyArray<{ method: 'GET' | 'POST' | 'PATCH' | 'DEL
   { method: 'GET', path: '/lab/state', summary: 'phase, god seat, gates' },
   { method: 'POST', path: '/lab/start', summary: 'campaign started' },
   { method: 'POST', path: '/lab/pause', summary: 'pause or resume' },
+  { method: 'POST', path: '/lab/finish', summary: 'campaign finished: back to idle' },
   { method: 'POST', path: '/lab/approve', summary: 'approve a human gate (all pending when no gateId)' },
   { method: 'POST', path: '/lab/gate', summary: 'raise a human gate: a blocked card with a question' },
   { method: 'POST', path: '/lab/agents', summary: 'register (upsert) a lab agent' },
@@ -57,6 +58,7 @@ export const LAB_ROUTES: ReadonlyArray<{ method: 'GET' | 'POST' | 'PATCH' | 'DEL
   { method: 'POST', path: '/lab/progress', summary: 'a lab-v4-progress/1 snapshot' },
   { method: 'GET', path: '/lab/progress', summary: 'the latest snapshot' },
   { method: 'POST', path: '/lab/board', summary: 'replace one managed section of board.md' },
+  { method: 'POST', path: '/lab/agent-files', summary: 'replace one managed section of a lab agent\'s identity.md / memory.md' },
   { method: 'POST', path: '/lab/log', summary: 'append an event to log.jsonl' }
 ];
 
@@ -95,6 +97,8 @@ export interface LabControlDeps {
   /** Price tokens when the caller did not supply a dollar figure. */
   priceUsd?: (model: string, tokens: { input: number; output: number; cacheRead: number; cacheCreation: number }) => number;
   board: (section: string, markdown: string) => boolean;
+  /** Replace a marker-fenced section of a LAB agent's identity.md or memory.md (refused for any other agent). */
+  agentFile: (agentId: string, file: 'identity' | 'memory', markdown: string) => { ok: boolean; error?: string };
   log: (event: Record<string, unknown>) => void;
   /** Called with each accepted snapshot (the app pushes it to the renderer and may persist it). */
   onProgress?: (snapshot: Record<string, unknown>) => void;
@@ -400,6 +404,12 @@ export class LabControlServer {
         const v = need(validatePause(body)); if (failed(v)) return bad(v.__err);
         return ok({ state: this.setPaused(v.paused) });
       }
+      case 'finish': {
+        this.phase = 'idle';
+        this.deps.log({ kind: 'lab-finish-app', campaign: this.campaign });
+        this.publish();
+        return ok({ state: this.view() });
+      }
       case 'approve': {
         const v = need(validateApprove(body)); if (failed(v)) return bad(v.__err);
         if (v.gateId && !this.gates.has(v.gateId)) return { status: 404, body: { ok: false, error: `no gate "${v.gateId}"` } };
@@ -460,6 +470,11 @@ export class LabControlServer {
         const v = need(validateBoard(body)); if (failed(v)) return bad(v.__err);
         return ok({ changed: this.deps.board(v.section, v.markdown) });
       }
+      case 'agent-files': {
+        const v = need(validateAgentFile(body)); if (failed(v)) return bad(v.__err);
+        const r = this.deps.agentFile(v.agentId, v.file, v.markdown);
+        return r.ok ? ok() : { status: 403, body: { ok: false, error: r.error ?? 'refused' } };
+      }
       case 'log': {
         const v = need(validateLog(body)); if (failed(v)) return bad(v.__err);
         this.deps.log(v);
@@ -496,6 +511,7 @@ function matchRoute(method: string, pathname: string): RouteHit | 'method' | nul
     [/^\/lab\/state$/, { GET: 'state' }],
     [/^\/lab\/start$/, { POST: 'start' }],
     [/^\/lab\/pause$/, { POST: 'pause' }],
+    [/^\/lab\/finish$/, { POST: 'finish' }],
     [/^\/lab\/approve$/, { POST: 'approve' }],
     [/^\/lab\/gate$/, { POST: 'gate' }],
     [/^\/lab\/agents$/, { POST: 'agents' }],
@@ -506,6 +522,7 @@ function matchRoute(method: string, pathname: string): RouteHit | 'method' | nul
     [/^\/lab\/cost$/, { POST: 'cost' }],
     [/^\/lab\/progress$/, { POST: 'progress:post', GET: 'progress:get' }],
     [/^\/lab\/board$/, { POST: 'board' }],
+    [/^\/lab\/agent-files$/, { POST: 'agent-files' }],
     [/^\/lab\/log$/, { POST: 'log' }]
   ];
   for (const [re, methods] of table) {

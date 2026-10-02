@@ -2481,6 +2481,40 @@ export class HiveManager {
     this.commit(`hive: register ${meta.id}`);
   }
 
+  /** Replace a marker-fenced section of a LAB agent's identity.md / memory.md. Refused for any agent whose registry provider is not 'lab'. */
+  writeAgentSection(agentId: string, file: 'identity' | 'memory', markdown: string): { ok: boolean; error?: string } {
+    const root = this.root();
+    if (!root) return { ok: false, error: 'hive disabled (no harnessHome)' };
+    const entry = this.registry().agents[agentId];
+    if (!entry || entry.provider !== 'lab') return { ok: false, error: `"${agentId}" is not a registered lab agent` };
+    const path = join(this.agentDir(agentId), `${file}.md`);
+    const header = file === 'memory'
+      ? `# Memory — ${entry.name} (${agentId})\n\n_Append durable facts, decisions, and context below._\n`
+      : `# ${entry.name} (${agentId})\n\n- Role: ${entry.role ?? 'agent'}\n`;
+    const current = existsSync(path) ? readFileSync(path, 'utf8') : null;
+    const next = upsertManagedSection(current, file, markdown, header);
+    if (next !== current) writeFileSync(path, next, 'utf8');
+    return { ok: true };
+  }
+
+  /** Acknowledge the mail of every lab agent: move inbox/*.json to inbox/.done and advance cursor.json. */
+  ackLabInboxes(): void {
+    const root = this.root();
+    if (!root) return;
+    for (const [id, a] of Object.entries(this.registry().agents)) {
+      if (a.provider !== 'lab' || a.archived) continue;
+      const inbox = join(this.agentDir(id), 'inbox');
+      let files: string[] = [];
+      try { files = readdirSync(inbox).filter((f) => f.endsWith('.json')).sort(); } catch { continue; }
+      if (!files.length) continue;
+      try {
+        mkdirSync(join(inbox, '.done'), { recursive: true });
+        for (const f of files) renameSync(join(inbox, f), join(inbox, '.done', f));
+        this.writeJson(join(this.agentDir(id), 'cursor.json'), { lastProcessed: files[files.length - 1].replace(/\.json$/, '') });
+      } catch { /* best-effort: an unread lab inbox is harmless */ }
+    }
+  }
+
   /** Replace one marker-fenced section of board.md (shared/managedSection.ts), leaving the rest untouched. Returns whether the file changed. */
   writeBoardSection(name: string, markdown: string): boolean {
     const root = this.root();

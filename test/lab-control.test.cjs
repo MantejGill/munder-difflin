@@ -13,7 +13,7 @@ const { resolveLabMode } = loadTs('src/shared/labMode.ts');
 
 /** In-memory stand-in for the hive: the control server only ever talks to it through LabControlDeps. */
 function makeDeps(dir) {
-  const calls = { send: [], status: [], cost: [], log: [], board: [], registered: [], states: [], progress: [], ignored: [] };
+  const calls = { send: [], status: [], cost: [], log: [], board: [], files: [], registered: [], states: [], progress: [], ignored: [] };
   const tasks = new Map();
   const deps = {
     hiveDir: () => dir,
@@ -28,6 +28,7 @@ function makeDeps(dir) {
     cost: (row) => calls.cost.push(row),
     priceUsd: (model, t) => (t.input + t.output) / 1e6,
     board: (section, md) => { calls.board.push({ section, md }); return true; },
+    agentFile: (agentId, file, md) => { calls.files.push({ agentId, file, md }); return agentId.startsWith('lab-') ? { ok: true } : { ok: false, error: 'not a lab agent' }; },
     log: (e) => calls.log.push(e),
     onProgress: (s) => calls.progress.push(s),
     onState: (s) => calls.states.push(s),
@@ -207,6 +208,8 @@ test('validation: a bad body is a 400 with a reason and has NO effect', async ()
     await bad('/lab/progress', { schema: 'something-else/1' });
     await bad('/lab/progress', { schema: 'lab-v4-progress/1', curve: 'nope' });
     await bad('/lab/board', { section: 'Bad Section!', markdown: 'x' });
+    await bad('/lab/agent-files', { agentId: 'lab-e1', file: 'passwd', markdown: 'x' });
+    await bad('/lab/agent-files', { agentId: '../x', file: 'memory', markdown: 'x' });
     await bad('/lab/log', { kind: 'Not A Slug' });
     await bad('/lab/gate', { id: 'g1', title: 't' });
     await bad('/lab/gate', { id: 'g1', kind: 'mystery', title: 't', question: 'q' });
@@ -219,6 +222,7 @@ test('validation: a bad body is a 400 with a reason and has NO effect', async ()
     assert.equal(lab.calls.status.length, 0);
     assert.equal(lab.calls.cost.length, 0);
     assert.equal(lab.calls.board.length, 0);
+    assert.equal(lab.calls.files.length, 0);
     assert.equal(lab.calls.progress.length, 0);
   } finally { lab.stop(); }
 });
@@ -259,6 +263,9 @@ test('messages, agents, status, board and log reach their callbacks with clean v
     assert.deepEqual(lab.calls.status[0], { agentId: 'lab-e1', event: 'PreToolUse', tool: 'Bash', context: { tokens: 1000, limit: 200000 } });
     assert.equal((await lab.call('POST', '/lab/board', { section: 'lab-board', markdown: '## Board' })).json.changed, true);
     assert.deepEqual(lab.calls.board[0], { section: 'lab-board', md: '## Board' });
+    assert.equal((await lab.call('POST', '/lab/agent-files', { agentId: 'lab-e1', file: 'memory', markdown: '## Notes' })).status, 200);
+    assert.deepEqual(lab.calls.files[0], { agentId: 'lab-e1', file: 'memory', md: '## Notes' });
+    assert.equal((await lab.call('POST', '/lab/agent-files', { agentId: 'pam', file: 'memory', markdown: 'x' })).status, 403, 'only lab agents');
     assert.equal((await lab.call('POST', '/lab/log', { kind: 'lab-event', type: 'round' })).status, 200);
     assert.ok(lab.calls.log.some((e) => e.kind === 'lab-event' && e.type === 'round'));
   } finally { lab.stop(); }
@@ -304,6 +311,8 @@ test('lab verbs: start, pause, resume change the phase and notify the app', asyn
     const st = (await lab.call('GET', '/lab/state')).json.state;
     assert.equal(st.god.name, 'Dwight');
     assert.deepEqual(lab.calls.states.map((s) => s.phase).slice(-3), ['running', 'paused', 'running']);
+    assert.equal((await lab.call('POST', '/lab/finish', {})).json.state.phase, 'idle');
+    assert.equal(lab.calls.states.at(-1).phase, 'idle');
   } finally { lab.stop(); }
 });
 

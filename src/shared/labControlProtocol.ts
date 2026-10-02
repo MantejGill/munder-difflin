@@ -338,6 +338,15 @@ export function validateProgress(body: unknown): Validated<Obj> {
   return good(snap);
 }
 
+/** A marker-fenced section of one lab agent's identity.md or memory.md. */
+export function validateAgentFile(body: unknown): Validated<{ agentId: string; file: 'identity' | 'memory'; markdown: string }> {
+  if (!isObj(body)) return fail('body must be a JSON object');
+  const agentId = id(body.agentId, 'agentId'); if (!agentId.ok) return agentId;
+  if (body.file !== 'identity' && body.file !== 'memory') return fail('file: expected "identity" or "memory"');
+  if (typeof body.markdown !== 'string' || body.markdown.length > 100_000) return fail('markdown: expected at most 100000 characters');
+  return good({ agentId: agentId.value, file: body.file, markdown: body.markdown });
+}
+
 export function validateBoard(body: unknown): Validated<{ section: string; markdown: string }> {
   if (!isObj(body)) return fail('body must be a JSON object');
   if (typeof body.section !== 'string' || !/^[a-z0-9][a-z0-9-]{0,39}$/.test(body.section)) return fail('section: expected a lowercase slug');

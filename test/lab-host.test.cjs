@@ -59,6 +59,7 @@ test('lab mode on: the god seat is Dwight, PTY-less, with the lab contract as id
   assert.ok(fs.existsSync(path.join(f.root, 'agents', 'god', 'inbox', '.done')));
   // nothing was spawned: the hive has no spawn queue activity and the registry holds exactly the god
   assert.deepEqual(Object.keys(reg.agents), ['god']);
+  assert.equal(f.host.server().view().phase, 'idle');
   // and the PTY-less god is never an orphan
   assert.deepEqual(selectOrphansToArchive(reg.agents, reg.godId, () => false), []);
 });
@@ -144,15 +145,49 @@ test('messages are routed by the app: into the recipient inbox (no terminal hand
   const b = await call('POST', '/lab/messages', { from: 'god', to: 'lab-e1', act: 'request', subject: 'Run trial', body: 'go' });
   assert.equal(a.status, 200);
   assert.equal(b.status, 200);
-  assert.equal(f.hive.inbox('god').length, 1);
-  assert.equal(f.hive.inbox('lab-e1').length, 1);
-  assert.equal(f.hive.inbox('lab-e1')[0].subject, 'Run trial');
+  // delivered by the router into each recipient's inbox, then acknowledged by the app (the files are kept in inbox/.done for audit)
+  const doneOf = (id) => fs.readdirSync(path.join(f.root, 'agents', id, 'inbox', '.done')).map((n) => JSON.parse(fs.readFileSync(path.join(f.root, 'agents', id, 'inbox', '.done', n), 'utf8')));
+  assert.deepEqual(doneOf('god').map((m) => m.subject), ['Plan']);
+  assert.deepEqual(doneOf('lab-e1').map((m) => m.subject), ['Run trial']);
+  assert.equal(f.hive.inbox('lab-e1').length, 0);
   assert.equal(sent(f.sends, 'hive:terminalHandoff').length, 0, 'a lab agent has no terminal to hand work to');
   const log = f.hive.logTail(50).filter((e) => e.kind === 'message');
   assert.equal(log.length, 2);
   assert.deepEqual(log[1].delivered, ['lab-e1']);
   // past the hop cap the app drops it, exactly as for any agent
   await call('POST', '/lab/messages', { from: 'god', to: 'lab-e1', act: 'inform', subject: 'loop', hops: 99 });
+});
+
+test('lab agents\' identity/memory sections are written by the app, and only for lab agents; their mail is acknowledged', async (t) => {
+  const f = floor(t, { env: { MD_LAB_CONTROL: '1' } });
+  await f.host.start();
+  const { call } = clientFromControlFile(f.root);
+  await call('POST', '/lab/agents', { id: 'lab-e1', name: 'Kevin', role: 'Trial Executor' });
+  assert.equal((await call('POST', '/lab/agent-files', { agentId: 'lab-e1', file: 'memory', markdown: '## Lab memory\n- noted' })).status, 200);
+  assert.equal((await call('POST', '/lab/agent-files', { agentId: 'lab-e1', file: 'memory', markdown: '## Lab memory\n- noted again' })).status, 200);
+  const memory = fs.readFileSync(path.join(f.root, 'agents', 'lab-e1', 'memory.md'), 'utf8');
+  assert.match(memory, /^# Memory — Kevin \(lab-e1\)/, 'the app\'s own header is kept');
+  assert.match(memory, /noted again/);
+  assert.ok(!memory.includes('- noted\n'), 'the section was replaced, not appended twice');
+  // a human agent (not lab) is refused: the lab can never write into another agent's directory
+  fs.mkdirSync(path.join(f.root, 'agents', 'pam'), { recursive: true });
+  fs.writeFileSync(path.join(f.root, 'agents', 'pam', 'memory.md'), 'Pam remembers.\n');
+  const reg = f.hive.registry(); reg.agents.pam = { id: 'pam', name: 'Pam', provider: 'claude', role: 'x', cwd: '/x', status: 'idle', lastSeen: 1 };
+  fs.writeFileSync(path.join(f.root, 'registry.json'), JSON.stringify(reg));
+  assert.equal((await call('POST', '/lab/agent-files', { agentId: 'pam', file: 'memory', markdown: 'hijack' })).status, 403);
+  assert.equal(fs.readFileSync(path.join(f.root, 'agents', 'pam', 'memory.md'), 'utf8'), 'Pam remembers.\n');
+  assert.equal((await call('POST', '/lab/agent-files', { agentId: 'ghost', file: 'memory', markdown: 'x' })).status, 403);
+  // mail: delivered into the inbox by the router, then acknowledged by the app (inbox/.done, cursor advanced)
+  await call('POST', '/lab/messages', { from: 'god', to: 'lab-e1', act: 'request', subject: 'Run trial', body: 'go' });
+  assert.equal(f.hive.inbox('lab-e1').length, 0, 'no backlog builds up for an agent nobody can wake');
+  const done = fs.readdirSync(path.join(f.root, 'agents', 'lab-e1', 'inbox', '.done'));
+  assert.equal(done.length, 1);
+  const cursor = JSON.parse(fs.readFileSync(path.join(f.root, 'agents', 'lab-e1', 'cursor.json'), 'utf8'));
+  assert.equal(cursor.lastProcessed, done[0].replace(/\.json$/, ''));
+  // a non-lab agent's mail is NOT touched by the acknowledgement
+  fs.mkdirSync(path.join(f.root, 'agents', 'pam', 'inbox'), { recursive: true });
+  await call('POST', '/lab/messages', { from: 'god', to: 'pam', act: 'inform', subject: 'hi', body: 'b' });
+  assert.equal(f.hive.inbox('pam').length, 1);
 });
 
 test('status and context drive the avatar and gauge; cost lands in the ledger as cumulative rows and on the telemetry channel', async (t) => {

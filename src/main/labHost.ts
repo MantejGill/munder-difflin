@@ -62,7 +62,12 @@ export function createLabHost(d: LabHostDeps): LabHost {
     patchTask: (id, p) => d.hive.patchTask(id, p as Partial<Omit<HiveTask, 'id'>>),
     deleteTask: (id) => d.hive.deleteTask(id),
     getTask: findTask,
-    send: (partial, from) => d.hive.send(partial as Partial<HiveMessage>, from),
+    send: (partial, from) => {
+      const msg = d.hive.send(partial as Partial<HiveMessage>, from);
+      // Nothing reads a lab agent's inbox (no terminal, no CLI): the app acknowledges its mail so no backlog builds up.
+      d.hive.ackLabInboxes();
+      return msg;
+    },
     registerAgent: (spec) => {
       const m = mode();
       try {
@@ -96,6 +101,7 @@ export function createLabHost(d: LabHostDeps): LabHost {
       inputTokens: t.input, outputTokens: t.output, cacheReadTokens: t.cacheRead, cacheWriteTokens: t.cacheCreation
     }),
     board: (section, markdown) => d.hive.writeBoardSection(section, markdown),
+    agentFile: (agentId, file, markdown) => d.hive.writeAgentSection(agentId, file, markdown),
     log: (event) => d.hive.appendLog(event),
     onProgress: (snap) => d.sendToRenderer('lab:progress', snap),
     onState: (view) => d.sendToRenderer('lab:state', view),
