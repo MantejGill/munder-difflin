@@ -8,6 +8,14 @@ All notable changes to this project are documented here. The format is based on
 
 ### Added
 
+- **Lab mode (off by default).** `MD_LAB_CONTROL=1` (or `lab.enabled` in `config.json`) runs a
+  loopback-only control server (127.0.0.1, random port, bearer token in `<hive>/lab-control.json`)
+  that an external research loop drives the office through, and replaces Michael's seat with a
+  terminal-less orchestrator named from the config (default "Dwight"). Lab agents are a new `lab`
+  provider: avatar, status, cost and context gauges, kanban assignment, no terminal, never archived as
+  orphans. A `lab` tab in the Command Center shows the progress curve, ladder, reframes (predicted vs
+  measured), ruled-out list, held-out lesson gate and budget, and human gates become blocked cards on
+  the ASK ME board. See `docs/LAB_MODE.md`. Nothing changes when it is off.
 - **Tasks show their id.** The one thing people actually refer to a card by — `bmt-12` — was not
   displayed anywhere: not on the kanban card, which printed only the title and the assignee, and not
   in the detail view behind it. It now leads the card above the title, and leads the detail view's
