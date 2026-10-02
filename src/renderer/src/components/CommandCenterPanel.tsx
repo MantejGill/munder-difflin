@@ -36,7 +36,7 @@ import {
   AGENT_PROVIDER_PRESETS,
   type AgentProvider
 } from '@/store/config';
-import { canReceiveInbox } from '@shared/agentProvider';
+import { canReceiveInbox, isPtylessProvider } from '@shared/agentProvider';
 import { isComposingKey } from '@shared/imeGuard';
 import { useRtl } from '@/i18n/useDirection';
 
@@ -807,7 +807,7 @@ function FloorTab({ seed }: { seed: { text: string; seq: number } }) {
                 here. The GOD agent's model lives in the engine row below
                 (provider+model+apply), so we DON'T render this second selector for
                 it — one model picker, not two. */}
-            {!a.isGod && (
+            {!a.isGod && !isPtylessProvider(a.provider) && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
               <Select
                 value={encodeProviderModel(agentProvider, a.model)}
@@ -882,7 +882,8 @@ function FloorTab({ seed }: { seed: { text: string; seq: number } }) {
                 {restartErrors[a.id]}
               </div>
             )}
-            {a.isGod && (
+            {/* A lab agent (and a lab god) has no terminal to restart and no CLI to switch: no engine or model control. */}
+            {a.isGod && !isPtylessProvider(a.provider) && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 11, color: 'var(--cth-ink-500)', flexShrink: 0 }}>{t('commandCenter.engine')}</span>
                 <Select

@@ -209,7 +209,8 @@ export function App() {
     if (!config?.onboardingComplete) return;
     const DEMO = import.meta.env.DEV && import.meta.env.VITE_CTH_DEMO === '1';
     const evaluate = () => {
-      const hasLive = useStore.getState().agents.some((a) => a.ptyId);
+      // A lab agent has no PTY but is just as real: the lab drives it, and the demo loop must never step it.
+      const hasLive = useStore.getState().agents.some((a) => a.ptyId || a.provider === 'lab');
       if (DEMO || !hasLive) startMockLoop();
       else stopMockLoop();
     };

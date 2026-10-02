@@ -54,3 +54,15 @@ test('the inbox-wake and queue loops only visit agents that own a PTY (so a lab 
   assert.match(src, /useStore\.getState\(\)\.agents\.filter\(\(a\) => a\.ptyId\)/, 'wake loop filters on ptyId');
   assert.match(src, /for \(const a of agents\) \{\n\s+if \(!a\.ptyId\) continue;/, 'context trigger loop skips PTY-less agents');
 });
+
+test('the synthetic demo loop never animates a lab floor: a lab agent counts as live', () => {
+  const app = fs.readFileSync(path.join(__dirname, '..', 'src/renderer/src/App.tsx'), 'utf8');
+  assert.match(app, /const hasLive = useStore\.getState\(\)\.agents\.some\(\(a\) => a\.ptyId \|\| a\.provider === 'lab'\);/);
+  assert.match(app, /if \(DEMO \|\| !hasLive\) startMockLoop\(\);/, 'the demo and empty-floor paths are as before');
+});
+
+test('the monitor tab offers no engine, model or restart control for a PTY-less agent (it could only spawn a CLI into a lab seat)', () => {
+  const panel = fs.readFileSync(path.join(__dirname, '..', 'src/renderer/src/components/CommandCenterPanel.tsx'), 'utf8');
+  assert.match(panel, /\{!a\.isGod && !isPtylessProvider\(a\.provider\) && \(/, 'the per-agent model/restart row is hidden');
+  assert.match(panel, /\{a\.isGod && !isPtylessProvider\(a\.provider\) && \(/, 'the god engine row (apply / restart & continue) is hidden');
+});
