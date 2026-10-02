@@ -41,6 +41,8 @@ export function createLabHost(d: LabHostDeps): LabHost {
   const env = d.env ?? process.env;
   const mode = (): LabMode => resolveLabMode(d.readLabConfig(), env);
   let server: LabControlServer | null = null;
+  // What the renderer was last told about each lab agent (name + role): a floor card is announced when new or renamed, not on every re-registration.
+  const announced = new Map<string, string>();
 
   const seatGod = (): void => {
     const m = mode();
@@ -75,18 +77,24 @@ export function createLabHost(d: LabHostDeps): LabHost {
         if (spec.id === m.godId) { seatGod(); return { ok: true }; }
         const cwd = d.hive.root() ?? '';
         d.hive.registerLabAgent({ id: spec.id, name: spec.name, role: spec.role, cwd, capabilities: spec.capabilities });
-        d.sendToRenderer('hive:agentSpawned', {
-          id: spec.id, name: spec.name, provider: 'lab', cwd, role: spec.role,
-          character: spec.character, accent: spec.accent, model: spec.model, ptyless: true
-        });
+        const key = JSON.stringify([spec.name, spec.role]);
+        if (announced.get(spec.id) !== key) {
+          announced.set(spec.id, key);
+          d.sendToRenderer('hive:agentSpawned', {
+            id: spec.id, name: spec.name, provider: 'lab', cwd, role: spec.role,
+            character: spec.character, accent: spec.accent, model: spec.model, ptyless: true
+          });
+        }
         return { ok: true };
       } catch (e) {
         return { ok: false, error: e instanceof Error ? e.message : String(e) };
       }
     },
     status: (s) => {
-      const payload = { agentId: s.agentId, event: s.event, tool: s.tool, message: s.message, blocked: false };
-      if (validateHookEvent(payload)) d.sendToRenderer('hive:hookEvent', payload);
+      if (s.event) {
+        const payload = { agentId: s.agentId, event: s.event, tool: s.tool, message: s.message, blocked: false };
+        if (validateHookEvent(payload)) d.sendToRenderer('hive:hookEvent', payload);
+      }
       if (s.context) d.sendToRenderer('hive:contextUpdate', { agentId: s.agentId, tokens: s.context.tokens, limit: s.context.limit });
     },
     cost: (row: LabCostRow) => {
@@ -120,7 +128,7 @@ export function createLabHost(d: LabHostDeps): LabHost {
       if (!r.ok) server = null;
       return r;
     },
-    stop() { try { server?.stop(); } catch { /* noop */ } server = null; },
+    stop() { try { server?.stop(); } catch { /* noop */ } server = null; announced.clear(); },
     server: () => server,
     state: () => server?.view() ?? null,
     progress: () => server?.latestProgress() ?? null,

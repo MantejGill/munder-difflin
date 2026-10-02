@@ -200,6 +200,7 @@ test('validation: a bad body is a 400 with a reason and has NO effect', async ()
     await bad('/lab/agents', { id: 'lab-e1', name: 'Kevin', isGod: true });
     await bad('/lab/agents', { id: 'lab-e1', name: 'Kevin', accent: 'puce' });
     await bad('/lab/status', { agentId: 'lab-e1', event: 'Explode' });
+    await bad('/lab/status', { agentId: 'lab-e1' });
     await bad('/lab/status', { agentId: 'lab-e1', context: { tokens: -1, limit: 10 } });
     await bad('/lab/status', { agentId: 'lab-e1', context: { tokens: 5, limit: 0 } });
     await bad('/lab/cost', { agentId: 'lab-e1', model: 'm' });

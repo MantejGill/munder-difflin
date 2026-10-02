@@ -142,7 +142,7 @@ function Reframes({ model }: { model: LabPanelModel }) {
         <div key={r.id} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
           <div style={{ display: 'flex', gap: 6, alignItems: 'baseline' }}>
             <Chip color={REFRAME_COLOR[r.state]}>{r.state.toUpperCase()}</Chip>
-            <span style={{ fontFamily: 'var(--cth-font-mono)', fontSize: 10, color: 'var(--cth-ink-500)' }}>{r.id}</span>
+            <span style={{ fontFamily: 'var(--cth-font-mono)', fontSize: 10, color: 'var(--cth-ink-500)', flexShrink: 0, whiteSpace: 'nowrap' }}>{r.id}</span>
             <span style={{ fontSize: 12, color: 'var(--cth-ink-900)', minWidth: 0 }}>{r.name}</span>
           </div>
           <div style={{ fontSize: 11, color: 'var(--cth-ink-500)' }}>challenges "{r.assumption}" · trial {r.trial}</div>

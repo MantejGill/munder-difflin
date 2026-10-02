@@ -200,6 +200,10 @@ test('status and context drive the avatar and gauge; cost lands in the ledger as
   const hooks = sent(f.sends, 'hive:hookEvent');
   assert.deepEqual(hooks.map((h) => [h.agentId, h.event, h.tool]), [['lab-e1', 'PreToolUse', 'Bash'], ['lab-e1', 'Stop', undefined]]);
   assert.deepEqual(sent(f.sends, 'hive:contextUpdate'), [{ agentId: 'lab-e1', tokens: 50000, limit: 200000 }]);
+  // a gauge-only report moves the gauge and produces NO avatar event (it used to read as an idle Notification)
+  await call('POST', '/lab/status', { agentId: 'lab-e1', context: { tokens: 60000, limit: 200000 } });
+  assert.equal(sent(f.sends, 'hive:hookEvent').length, 2);
+  assert.equal(sent(f.sends, 'hive:contextUpdate').length, 2);
 
   await call('POST', '/lab/cost', { agentId: 'lab-e1', sessionId: 's1', model: 'claude-opus-4-8', input: 1000, output: 200, usd: 0.25 });
   await call('POST', '/lab/cost', { agentId: 'lab-e1', sessionId: 's1', model: 'claude-opus-4-8', input: 500, output: 100 });

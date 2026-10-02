@@ -224,7 +224,8 @@ export function validateMessage(body: unknown): Validated<LabMessage> {
 
 export interface LabStatus {
   agentId: string;
-  event: string;
+  /** Absent for a context-gauge-only report: no avatar event is produced. */
+  event?: string;
   tool?: string;
   message?: string;
   context?: { tokens: number; limit: number };
@@ -233,9 +234,9 @@ export interface LabStatus {
 export function validateStatus(body: unknown): Validated<LabStatus> {
   if (!isObj(body)) return fail('body must be a JSON object');
   const agentId = id(body.agentId, 'agentId'); if (!agentId.ok) return agentId;
-  const event = body.event ?? 'Notification';
-  if (typeof event !== 'string' || !(HOOK_EVENTS as readonly string[]).includes(event)) return fail(`event: expected one of ${HOOK_EVENTS.join(', ')}`);
-  const out: LabStatus = { agentId: agentId.value, event };
+  const event = body.event;
+  if (event !== undefined && (typeof event !== 'string' || !(HOOK_EVENTS as readonly string[]).includes(event))) return fail(`event: expected one of ${HOOK_EVENTS.join(', ')}`);
+  const out: LabStatus = { agentId: agentId.value, ...(event !== undefined ? { event } : {}) };
   if (body.tool !== undefined) { const t = str(body.tool, 60, 1); if (t === null) return fail('tool: expected 1-60 characters'); out.tool = t; }
   if (body.message !== undefined) { const t = str(body.message, 500); if (t === null) return fail('message: expected at most 500 characters'); out.message = t; }
   if (body.context !== undefined) {

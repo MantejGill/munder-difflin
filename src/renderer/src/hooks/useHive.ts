@@ -292,7 +292,12 @@ function labAccent(id: string): (typeof SPAWN_ACCENTS)[number] {
 function addLabAgentCard(rec: {
   id: string; name: string; cwd: string; role?: string; character?: string; accent?: string; model?: string;
 }): void {
-  if (useStore.getState().agents.some((a) => a.id === rec.id)) return;
+  const known = useStore.getState().agents.find((a) => a.id === rec.id);
+  if (known) {
+    // A re-registration (the lab renamed the agent or changed its role): refresh the card, never duplicate it.
+    useStore.getState().updateAgent(rec.id, { name: rec.name || rec.id, description: rec.role || known.description });
+    return;
+  }
   const castMember = (q?: string) =>
     q ? OFFICE_CAST.find((m) => m.name === q || m.displayName.toLowerCase() === q)?.name : undefined;
   const character =
