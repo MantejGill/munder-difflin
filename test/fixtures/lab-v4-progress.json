@@ -1,0 +1,596 @@
+{
+  "note": "Three lab-v4-progress/1 snapshots recorded from the $0 lab-v4 dry run (scripted reframer, recorded instrument): not evidence of model capability.",
+  "snapshots": [
+    {
+      "schema": "lab-v4-progress/1",
+      "round": 1,
+      "caseKey": "case-406128",
+      "objective": {
+        "metricId": "setup_tns_ns",
+        "direction": "maximize",
+        "baseline": -44.60522300000002,
+        "bar": {
+          "metricId": "setup_tns_ns",
+          "unit": "ns",
+          "direction": "maximize",
+          "minRelativeGain": 0.05
+        }
+      },
+      "best": null,
+      "curve": [],
+      "ruledOut": [],
+      "rung": {
+        "id": "tune-parameters",
+        "index": 0,
+        "label": "tune parameters of the current method",
+        "available": [
+          "tune-parameters",
+          "change-structure"
+        ],
+        "exhausted": false,
+        "ladder": "pd-v6",
+        "plateauK": 2,
+        "plateauMinGain": 0.05,
+        "history": []
+      },
+      "plateau": {
+        "k": 2,
+        "minGain": 0.05,
+        "trialsSinceRungStart": 0,
+        "plateaued": false,
+        "reason": "window-not-full",
+        "unhandled": 0
+      },
+      "budget": {
+        "total": 4,
+        "experimentsUsed": 0,
+        "confirmationsUsed": 0,
+        "remaining": 4,
+        "reservedConfirmation": 1,
+        "reframe": {
+          "required": 1,
+          "tested": 0,
+          "owed": 1,
+          "pending": 1
+        }
+      },
+      "reframes": [
+        {
+          "id": "rf-1",
+          "round": 1,
+          "status": "pending",
+          "name": "rerun placement, density higher, timing-driven true",
+          "change": "method-structure",
+          "assumption": "local-eco-fixes-suffice",
+          "trialKey": "placement::{\"density\":\"higher\",\"timingDriven\":true}",
+          "predictedEffect": {
+            "metric": "setup_tns_ns",
+            "direction": "improve",
+            "magnitude": 0.15,
+            "confidence": 0.4
+          },
+          "measured": null,
+          "drop": null
+        }
+      ],
+      "nextCandidates": [
+        {
+          "key": "placement::{\"density\":\"higher\",\"timingDriven\":true}",
+          "actionId": "placement",
+          "params": {
+            "density": "higher",
+            "timingDriven": true
+          },
+          "rung": "change-structure",
+          "source": "reframe",
+          "reframeId": "rf-1"
+        },
+        {
+          "key": "repair-timing::{\"sequence\":\"sizing-only\",\"setupMarginNs\":0}",
+          "actionId": "repair-timing",
+          "params": {
+            "sequence": "sizing-only",
+            "setupMarginNs": 0
+          },
+          "rung": "tune-parameters",
+          "source": "ladder-rung"
+        },
+        {
+          "key": "repair-timing::{\"sequence\":\"buffering-only\",\"setupMarginNs\":0}",
+          "actionId": "repair-timing",
+          "params": {
+            "sequence": "buffering-only",
+            "setupMarginNs": 0
+          },
+          "rung": "tune-parameters",
+          "source": "ladder-rung"
+        },
+        {
+          "key": "repair-timing::{\"sequence\":\"full\",\"setupMarginNs\":0}",
+          "actionId": "repair-timing",
+          "params": {
+            "sequence": "full",
+            "setupMarginNs": 0
+          },
+          "rung": "tune-parameters",
+          "source": "ladder-rung"
+        },
+        {
+          "key": "repair-design::{}",
+          "actionId": "repair-design",
+          "params": {},
+          "rung": "tune-parameters",
+          "source": "ladder-rung"
+        }
+      ],
+      "violations": [],
+      "lessons": null
+    },
+    {
+      "schema": "lab-v4-progress/1",
+      "round": 5,
+      "caseKey": "case-406128",
+      "objective": {
+        "metricId": "setup_tns_ns",
+        "direction": "maximize",
+        "baseline": -44.60522300000002,
+        "bar": {
+          "metricId": "setup_tns_ns",
+          "unit": "ns",
+          "direction": "maximize",
+          "minRelativeGain": 0.05
+        }
+      },
+      "best": {
+        "key": "repair-timing::{\"sequence\":\"buffering-only\",\"setupMarginNs\":0}",
+        "actionId": "repair-timing",
+        "params": {
+          "sequence": "buffering-only",
+          "setupMarginNs": 0
+        },
+        "value": -43.076575999999996,
+        "gain": 0.03427058306602391,
+        "round": 5,
+        "evidenceRef": "sha256:v4-4"
+      },
+      "curve": [
+        {
+          "trial": 1,
+          "round": 4,
+          "key": "repair-timing::{\"sequence\":\"sizing-only\",\"setupMarginNs\":0}",
+          "value": -43.821417999999994,
+          "gain": 0.017572045318549848,
+          "bestGain": 0.017572045318549848,
+          "evidenceRef": "sha256:v4-3"
+        },
+        {
+          "trial": 2,
+          "round": 5,
+          "key": "repair-timing::{\"sequence\":\"buffering-only\",\"setupMarginNs\":0}",
+          "value": -43.076575999999996,
+          "gain": 0.03427058306602391,
+          "bestGain": 0.03427058306602391,
+          "evidenceRef": "sha256:v4-4"
+        }
+      ],
+      "ruledOut": [
+        {
+          "key": "repair-timing::{\"sequence\":\"sizing-only\",\"setupMarginNs\":0}",
+          "reason": "measured gain 1.76% on setup_tns_ns is below the 2.0% meaningful threshold",
+          "gain": 0.017572045318549848,
+          "evidenceRef": "sha256:v4-3",
+          "source": "trial"
+        }
+      ],
+      "rung": {
+        "id": "change-structure",
+        "index": 1,
+        "label": "change the method structure",
+        "available": [
+          "tune-parameters",
+          "change-structure"
+        ],
+        "exhausted": false,
+        "ladder": "pd-v6",
+        "plateauK": 2,
+        "plateauMinGain": 0.05,
+        "history": [
+          {
+            "round": 5,
+            "from": "tune-parameters",
+            "to": "change-structure",
+            "fromLabel": "tune parameters of the current method",
+            "toLabel": "change the method structure",
+            "reason": "plateau",
+            "window": {
+              "k": 2,
+              "minGain": 0.05,
+              "improvement": 0.03427058306602391,
+              "bestBeforeWindow": 0,
+              "bestNow": 0.03427058306602391,
+              "firstTrial": 0,
+              "lastTrial": 1
+            }
+          }
+        ]
+      },
+      "plateau": {
+        "k": 2,
+        "minGain": 0.05,
+        "trialsSinceRungStart": 2,
+        "plateaued": true,
+        "improvement": 0.03427058306602391,
+        "bestBeforeWindow": 0,
+        "bestNow": 0.03427058306602391,
+        "windowFirstTrial": 0,
+        "windowLastTrial": 1,
+        "unhandled": 0
+      },
+      "budget": {
+        "total": 4,
+        "experimentsUsed": 2,
+        "confirmationsUsed": 0,
+        "remaining": 2,
+        "reservedConfirmation": 1,
+        "reframe": {
+          "required": 1,
+          "tested": 0,
+          "owed": 1,
+          "pending": 4
+        }
+      },
+      "reframes": [
+        {
+          "id": "rf-1",
+          "round": 1,
+          "status": "pending",
+          "name": "rerun placement, density higher, timing-driven true",
+          "change": "method-structure",
+          "assumption": "local-eco-fixes-suffice",
+          "trialKey": "placement::{\"density\":\"higher\",\"timingDriven\":true}",
+          "predictedEffect": {
+            "metric": "setup_tns_ns",
+            "direction": "improve",
+            "magnitude": 0.15,
+            "confidence": 0.4
+          },
+          "measured": null,
+          "drop": null
+        },
+        {
+          "id": "rf-2",
+          "round": 2,
+          "status": "pending",
+          "name": "rerun placement, density default, timing-driven false",
+          "change": "method-structure",
+          "assumption": "local-eco-fixes-suffice",
+          "trialKey": "placement::{\"density\":\"default\",\"timingDriven\":false}",
+          "predictedEffect": {
+            "metric": "setup_tns_ns",
+            "direction": "improve",
+            "magnitude": 0.15,
+            "confidence": 0.4
+          },
+          "measured": null,
+          "drop": null
+        },
+        {
+          "id": "rf-3",
+          "round": 3,
+          "status": "pending",
+          "name": "rerun placement, density higher, timing-driven false",
+          "change": "method-structure",
+          "assumption": "local-eco-fixes-suffice",
+          "trialKey": "placement::{\"density\":\"higher\",\"timingDriven\":false}",
+          "predictedEffect": {
+            "metric": "setup_tns_ns",
+            "direction": "improve",
+            "magnitude": 0.15,
+            "confidence": 0.4
+          },
+          "measured": null,
+          "drop": null
+        },
+        {
+          "id": "rf-4",
+          "round": 4,
+          "status": "pending",
+          "name": "rerun placement, density default, timing-driven true",
+          "change": "method-structure",
+          "assumption": "local-eco-fixes-suffice",
+          "trialKey": "placement::{\"density\":\"default\",\"timingDriven\":true}",
+          "predictedEffect": {
+            "metric": "setup_tns_ns",
+            "direction": "improve",
+            "magnitude": 0.15,
+            "confidence": 0.4
+          },
+          "measured": null,
+          "drop": null
+        }
+      ],
+      "nextCandidates": [
+        {
+          "key": "placement::{\"density\":\"higher\",\"timingDriven\":true}",
+          "actionId": "placement",
+          "params": {
+            "density": "higher",
+            "timingDriven": true
+          },
+          "rung": "change-structure",
+          "source": "reframe",
+          "reframeId": "rf-1"
+        },
+        {
+          "key": "placement::{\"density\":\"default\",\"timingDriven\":false}",
+          "actionId": "placement",
+          "params": {
+            "density": "default",
+            "timingDriven": false
+          },
+          "rung": "change-structure",
+          "source": "reframe",
+          "reframeId": "rf-2"
+        },
+        {
+          "key": "placement::{\"density\":\"higher\",\"timingDriven\":false}",
+          "actionId": "placement",
+          "params": {
+            "density": "higher",
+            "timingDriven": false
+          },
+          "rung": "change-structure",
+          "source": "reframe",
+          "reframeId": "rf-3"
+        },
+        {
+          "key": "placement::{\"density\":\"default\",\"timingDriven\":true}",
+          "actionId": "placement",
+          "params": {
+            "density": "default",
+            "timingDriven": true
+          },
+          "rung": "change-structure",
+          "source": "reframe",
+          "reframeId": "rf-4"
+        }
+      ],
+      "violations": [],
+      "lessons": null
+    },
+    {
+      "schema": "lab-v4-progress/1",
+      "round": 9,
+      "caseKey": "case-406128",
+      "objective": {
+        "metricId": "setup_tns_ns",
+        "direction": "maximize",
+        "baseline": -44.60522300000002,
+        "bar": {
+          "metricId": "setup_tns_ns",
+          "unit": "ns",
+          "direction": "maximize",
+          "minRelativeGain": 0.05
+        }
+      },
+      "best": {
+        "key": "placement::{\"density\":\"higher\",\"timingDriven\":true}",
+        "actionId": "placement",
+        "params": {
+          "density": "higher",
+          "timingDriven": true
+        },
+        "value": -33.58051560000002,
+        "gain": 0.2471618043474414,
+        "round": 6,
+        "evidenceRef": "sha256:v4-5"
+      },
+      "curve": [
+        {
+          "trial": 1,
+          "round": 4,
+          "key": "repair-timing::{\"sequence\":\"sizing-only\",\"setupMarginNs\":0}",
+          "value": -43.821417999999994,
+          "gain": 0.017572045318549848,
+          "bestGain": 0.017572045318549848,
+          "evidenceRef": "sha256:v4-3"
+        },
+        {
+          "trial": 2,
+          "round": 5,
+          "key": "repair-timing::{\"sequence\":\"buffering-only\",\"setupMarginNs\":0}",
+          "value": -43.076575999999996,
+          "gain": 0.03427058306602391,
+          "bestGain": 0.03427058306602391,
+          "evidenceRef": "sha256:v4-4"
+        },
+        {
+          "trial": 3,
+          "round": 6,
+          "key": "placement::{\"density\":\"higher\",\"timingDriven\":true}",
+          "value": -33.58051560000002,
+          "gain": 0.2471618043474414,
+          "bestGain": 0.2471618043474414,
+          "evidenceRef": "sha256:v4-5"
+        }
+      ],
+      "ruledOut": [
+        {
+          "key": "repair-timing::{\"sequence\":\"sizing-only\",\"setupMarginNs\":0}",
+          "reason": "measured gain 1.76% on setup_tns_ns is below the 2.0% meaningful threshold",
+          "gain": 0.017572045318549848,
+          "evidenceRef": "sha256:v4-3",
+          "source": "trial"
+        }
+      ],
+      "rung": {
+        "id": "change-structure",
+        "index": 1,
+        "label": "change the method structure",
+        "available": [
+          "tune-parameters",
+          "change-structure"
+        ],
+        "exhausted": false,
+        "ladder": "pd-v6",
+        "plateauK": 2,
+        "plateauMinGain": 0.05,
+        "history": [
+          {
+            "round": 5,
+            "from": "tune-parameters",
+            "to": "change-structure",
+            "fromLabel": "tune parameters of the current method",
+            "toLabel": "change the method structure",
+            "reason": "plateau",
+            "window": {
+              "k": 2,
+              "minGain": 0.05,
+              "improvement": 0.03427058306602391,
+              "bestBeforeWindow": 0,
+              "bestNow": 0.03427058306602391,
+              "firstTrial": 0,
+              "lastTrial": 1
+            }
+          }
+        ]
+      },
+      "plateau": {
+        "k": 2,
+        "minGain": 0.05,
+        "trialsSinceRungStart": 1,
+        "plateaued": false,
+        "reason": "window-not-full",
+        "unhandled": 0
+      },
+      "budget": {
+        "total": 4,
+        "experimentsUsed": 3,
+        "confirmationsUsed": 1,
+        "remaining": 0,
+        "reservedConfirmation": 0,
+        "reframe": {
+          "required": 1,
+          "tested": 1,
+          "owed": 0,
+          "pending": 3
+        }
+      },
+      "reframes": [
+        {
+          "id": "rf-1",
+          "round": 1,
+          "status": "tested",
+          "name": "rerun placement, density higher, timing-driven true",
+          "change": "method-structure",
+          "assumption": "local-eco-fixes-suffice",
+          "trialKey": "placement::{\"density\":\"higher\",\"timingDriven\":true}",
+          "predictedEffect": {
+            "metric": "setup_tns_ns",
+            "direction": "improve",
+            "magnitude": 0.15,
+            "confidence": 0.4
+          },
+          "measured": {
+            "round": 6,
+            "gain": 0.2471618043474414,
+            "value": -33.58051560000002,
+            "evidenceRef": "sha256:v4-5",
+            "tainted": false,
+            "predictedGain": 0.15,
+            "error": 0.0971618043474414
+          },
+          "drop": null
+        },
+        {
+          "id": "rf-2",
+          "round": 2,
+          "status": "pending",
+          "name": "rerun placement, density default, timing-driven false",
+          "change": "method-structure",
+          "assumption": "local-eco-fixes-suffice",
+          "trialKey": "placement::{\"density\":\"default\",\"timingDriven\":false}",
+          "predictedEffect": {
+            "metric": "setup_tns_ns",
+            "direction": "improve",
+            "magnitude": 0.15,
+            "confidence": 0.4
+          },
+          "measured": null,
+          "drop": null
+        },
+        {
+          "id": "rf-3",
+          "round": 3,
+          "status": "pending",
+          "name": "rerun placement, density higher, timing-driven false",
+          "change": "method-structure",
+          "assumption": "local-eco-fixes-suffice",
+          "trialKey": "placement::{\"density\":\"higher\",\"timingDriven\":false}",
+          "predictedEffect": {
+            "metric": "setup_tns_ns",
+            "direction": "improve",
+            "magnitude": 0.15,
+            "confidence": 0.4
+          },
+          "measured": null,
+          "drop": null
+        },
+        {
+          "id": "rf-4",
+          "round": 4,
+          "status": "pending",
+          "name": "rerun placement, density default, timing-driven true",
+          "change": "method-structure",
+          "assumption": "local-eco-fixes-suffice",
+          "trialKey": "placement::{\"density\":\"default\",\"timingDriven\":true}",
+          "predictedEffect": {
+            "metric": "setup_tns_ns",
+            "direction": "improve",
+            "magnitude": 0.15,
+            "confidence": 0.4
+          },
+          "measured": null,
+          "drop": null
+        }
+      ],
+      "nextCandidates": [
+        {
+          "key": "placement::{\"density\":\"default\",\"timingDriven\":false}",
+          "actionId": "placement",
+          "params": {
+            "density": "default",
+            "timingDriven": false
+          },
+          "rung": "change-structure",
+          "source": "reframe",
+          "reframeId": "rf-2"
+        },
+        {
+          "key": "placement::{\"density\":\"higher\",\"timingDriven\":false}",
+          "actionId": "placement",
+          "params": {
+            "density": "higher",
+            "timingDriven": false
+          },
+          "rung": "change-structure",
+          "source": "reframe",
+          "reframeId": "rf-3"
+        },
+        {
+          "key": "placement::{\"density\":\"default\",\"timingDriven\":true}",
+          "actionId": "placement",
+          "params": {
+            "density": "default",
+            "timingDriven": true
+          },
+          "rung": "change-structure",
+          "source": "reframe",
+          "reframeId": "rf-4"
+        }
+      ],
+      "violations": [],
+      "lessons": null
+    }
+  ]
+}
