@@ -20,6 +20,7 @@ import { bridgeOf, providerPreset } from '../../../shared/agentProvider';
 import { isDurableRole, preferredAgentRole, roleForHiveSpawn } from '../../../shared/agentRole';
 import { inboxNudgeText } from '../../../shared/hiveNudge';
 import { resolveGodName } from '../../../shared/godIdentity';
+import { labGodCard } from '../../../shared/labMode';
 import { acquireTerminal, resetTerminal, isTerminalAutomationSafe } from '@/components/terminalPool';
 import { canDeliverToAgent, deliverWithAcknowledgement, checkPrecondition } from './queueDelivery';
 import { OFFICE_CAST, DEFAULT_CHARACTER } from '@/scene/office/cast';
@@ -276,6 +277,51 @@ function passesContextPressure(a: Agent, rule: ContextRule): boolean {
  *   3. wakes idle agents that have unread inbox messages so collaboration
  *      doesn't stall while an agent sits at its prompt.
  */
+/** The accent a lab agent gets when the lab did not choose one: stable per id, like the voice-hire palette. */
+function labAccent(id: string): (typeof SPAWN_ACCENTS)[number] {
+  let h = 0;
+  for (const ch of id) h = (h + ch.charCodeAt(0)) % SPAWN_ACCENTS.length;
+  return SPAWN_ACCENTS[h];
+}
+
+/**
+ * Put a PTY-less lab agent on the floor: an avatar, status, cost/context gauges and a kanban assignee, but no `ptyId`,
+ * so no terminal view, no wake nudge and no queue drain ever targets it. Selection stays where it was (the lab
+ * registers a whole team at once and must not drag the sidebar around).
+ */
+function addLabAgentCard(rec: {
+  id: string; name: string; cwd: string; role?: string; character?: string; accent?: string; model?: string;
+}): void {
+  if (useStore.getState().agents.some((a) => a.id === rec.id)) return;
+  const castMember = (q?: string) =>
+    q ? OFFICE_CAST.find((m) => m.name === q || m.displayName.toLowerCase() === q)?.name : undefined;
+  const character =
+    castMember(rec.character?.trim().toLowerCase()) ??
+    castMember((rec.name || rec.id).toLowerCase()) ??
+    DEFAULT_CHARACTER;
+  const accent = SPAWN_ACCENTS.find((a) => a === rec.accent?.trim().toLowerCase()) ?? labAccent(rec.id);
+  const before = useStore.getState().selectedId;
+  useStore.getState().addAgent({
+    id: rec.id,
+    name: rec.name || rec.id,
+    character,
+    accent,
+    description: rec.role || 'lab agent',
+    project: 'hive',
+    tmuxTarget: '',
+    cwd: rec.cwd,
+    status: 'idle',
+    action: 'idle',
+    progress: 0,
+    currentStation: 'desk',
+    provider: 'lab',
+    model: rec.model,
+    isGod: false,
+    recentTextTs: Date.now()
+  });
+  if (before) useStore.getState().select(before);
+}
+
 export function useHive(config: HarnessConfig | null): void {
   // Per-agent dedup for the inbox-wake nudge: every inbox message id we have
   // already nudged this agent about. A SET, not a high-water mark.
@@ -384,6 +430,44 @@ export function useHive(config: HarnessConfig | null): void {
         if (!cancelled) useStore.getState().setGodStatus('ready');
         return;
       }
+      // LAB MODE: the god seat is a PTY-less orchestrator named from the lab config (default "Dwight"). No CLI process is
+      // spawned, no /remote-control or orientation prompt is typed anywhere, and with no ptyId the inbox-wake and queue-drain
+      // loops never visit it. Outside lab mode this branch is skipped and everything below runs exactly as it always did.
+      const lab = await window.cth.labConfig?.().catch(() => null);
+      if (cancelled) return;
+      if (lab?.enabled) {
+        if (godSpawning.current) return;
+        godSpawning.current = true;
+        useStore.getState().removeAgent(GOD_ID); // clear any stale restored entry
+        const card = labGodCard(lab, OFFICE_CAST.map((c) => c.name));
+        useStore.getState().addAgent({
+          id: GOD_ID,
+          name: lab.godName,
+          character: card.character as Agent['character'],
+          accent: 'lemon',
+          description: card.description,
+          project: 'hive',
+          tmuxTarget: '',
+          cwd: config.harnessHome!,
+          status: 'idle',
+          action: card.action,
+          progress: 0,
+          currentStation: 'desk',
+          provider: 'lab',
+          isGod: true,
+          recentTextTs: Date.now()
+        });
+        useStore.getState().setGodStatus('ready');
+        // Lab agents already in the registry (the lab registered them before this window opened) get their floor cards.
+        const reg = await window.cth.hiveRegistry().catch(() => null);
+        for (const [id, entry] of Object.entries(reg?.agents ?? {})) {
+          if (id === GOD_ID || entry.provider !== 'lab' || entry.archived) continue;
+          addLabAgentCard({ id, name: entry.name, cwd: entry.cwd, role: entry.role });
+        }
+        useStore.getState().select(GOD_ID);
+        return;
+      }
+
       // Synchronous guard (no await between check and set) → exactly one spawn.
       if (cancelled || godSpawning.current) return;
       godSpawning.current = true;
@@ -1012,6 +1096,8 @@ export function useHive(config: HarnessConfig | null): void {
       if (!rec?.id) return;
       // addAgent is idempotent, but bail early if the renderer already carded it.
       if (useStore.getState().agents.some((a) => a.id === rec.id)) return;
+      // A lab agent has no terminal: its card is built without a PTY (see addLabAgentCard).
+      if (rec.ptyless || rec.provider === 'lab') { addLabAgentCard(rec); return; }
       // An explicit character wins; otherwise infer it from the name, which is
       // what makes "spawn one called Meredith" land on the Meredith avatar with
       // nothing else asked for. The explicit field covers what inference cannot
