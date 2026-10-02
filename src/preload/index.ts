@@ -13,6 +13,7 @@ export type { HeroPayload } from '../shared/heroPayload';
 import type { ModelCatalog } from '../shared/modelCatalogPayload';
 export type { ModelCatalog, CatalogModel } from '../shared/modelCatalogPayload';
 import type { HookEvent } from '../shared/hookEvents';
+import type { LabStateView } from '../shared/labProgress';
 export type { HookEvent } from '../shared/hookEvents';
 import type { LocalSkill, CatalogSkill } from '../main/skills';
 export type { LocalSkill, CatalogSkill } from '../main/skills';
@@ -759,6 +760,29 @@ const api = {
    *  keep running; Michael is told to stop routing work to them. */
   hiveSetAgentHold: (id: string, hold: boolean): Promise<{ ok: boolean; onHold?: boolean; error?: string }> =>
     ipcRenderer.invoke('hive:setAgentHold', id, hold),
+  // ─── Lab mode (inert unless the app runs in lab mode; see src/shared/labMode.ts) ─
+  /** Lab mode config: whether it is on, and the god seat's name/role/prompt. */
+  labConfig: (): Promise<{ enabled: boolean; godId: string; godName: string; godRole: string; godPrompt: string }> =>
+    ipcRenderer.invoke('lab:config'),
+  /** Phase, god seat and human gates of the running campaign (null when the control server is not up). */
+  labState: (): Promise<LabStateView | null> => ipcRenderer.invoke('lab:state'),
+  /** The latest lab-v4-progress/1 snapshot the lab pushed (null before the first round). */
+  labProgress: (): Promise<Record<string, unknown> | null> => ipcRenderer.invoke('lab:progress'),
+  /** Approve a human gate (all pending ones when gateId is omitted); the lab resumes. */
+  labApprove: (gateId?: string, answer?: string): Promise<{ ok: boolean; approved?: number; error?: string }> =>
+    ipcRenderer.invoke('lab:approve', gateId, answer),
+  labPause: (paused: boolean): Promise<{ ok: boolean; state?: LabStateView; error?: string }> =>
+    ipcRenderer.invoke('lab:pause', paused),
+  onLabProgress: (cb: (snapshot: Record<string, unknown>) => void): (() => void) => {
+    const listener = (_e: IpcRendererEvent, payload: Record<string, unknown>) => cb(payload);
+    ipcRenderer.on('lab:progress', listener);
+    return () => ipcRenderer.removeListener('lab:progress', listener);
+  },
+  onLabState: (cb: (state: LabStateView) => void): (() => void) => {
+    const listener = (_e: IpcRendererEvent, payload: LabStateView) => cb(payload);
+    ipcRenderer.on('lab:state', listener);
+    return () => ipcRenderer.removeListener('lab:state', listener);
+  },
   hiveBoard: (): Promise<string> => ipcRenderer.invoke('hive:board'),
   hiveTasks: (): Promise<unknown> => ipcRenderer.invoke('hive:tasks'),
   hiveLog: (n?: number): Promise<unknown[]> => ipcRenderer.invoke('hive:log', n ?? 200),
@@ -899,6 +923,8 @@ const api = {
       id: string; name: string; provider?: string; cwd: string;
       command?: string; role?: string; worktreePath?: string;
       character?: string; accent?: string;
+      /** A lab agent: no terminal, so the floor card carries no ptyId. */
+      ptyless?: boolean; model?: string;
     }) => void
   ): (() => void) => {
     const listener = (_e: IpcRendererEvent, payload: Parameters<typeof cb>[0]) => cb(payload);

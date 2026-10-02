@@ -41,6 +41,7 @@ import { MCP_CATALOG } from '../shared/mcpCatalog';
 import { selectBroadcastTargets } from '../shared/broadcast';
 import { preferredAgentRole } from '../shared/agentRole';
 import { mergeTaskLedger } from '../shared/taskLedger';
+import { upsertManagedSection } from '../shared/managedSection';
 import { expandTilde } from './fs';
 import { resolveGodName } from '../shared/godIdentity';
 
@@ -2427,6 +2428,82 @@ export class HiveManager {
       const reg = this.registry();
       return reg.godId === agentId || !!reg.agents[agentId]?.isGod;
     } catch { return false; }
+  }
+
+  // — lab mode (see labControl.ts) —
+
+  /**
+   * Register (upsert) an agent that has NO terminal: the lab provider. It gets the same on-disk shape a PTY agent has
+   * (inbox/, outbox/, cursor, memory.md, a registry row) so routing, the kanban and the memory views treat it like any
+   * other, but nothing is injected and nothing is spawned. `identity` (the god seat's lab contract) replaces identity.md
+   * wholesale; otherwise identity.md is only created when missing, so a section the lab wrote into it survives.
+   */
+  registerLabAgent(meta: {
+    id: string; name: string; role: string; cwd: string; capabilities?: string[]; isGod?: boolean; identity?: string;
+  }): void {
+    const root = this.root();
+    if (!root) return;
+    this.ensureHive();
+    const dir = this.agentDir(meta.id);
+    mkdirSync(join(dir, 'inbox', '.done'), { recursive: true });
+    mkdirSync(join(dir, 'outbox', '.sent'), { recursive: true });
+    const identity = join(dir, 'identity.md');
+    if (meta.identity !== undefined) writeFileSync(identity, meta.identity, 'utf8');
+    else if (!existsSync(identity)) {
+      writeFileSync(identity, `# ${meta.name} (${meta.id})\n\n- Role: ${meta.role}\n- Provider: lab (no terminal)\n`, 'utf8');
+    }
+    const memory = join(dir, 'memory.md');
+    if (!existsSync(memory)) {
+      writeFileSync(memory, `# Memory — ${meta.name} (${meta.id})\n\n_Append durable facts, decisions, and context below._\n`, 'utf8');
+    }
+    ensureMineIgnore(dir);
+    const cursor = join(dir, 'cursor.json');
+    if (!existsSync(cursor)) this.writeJson(cursor, { lastProcessed: null });
+    const reg = this.registry();
+    const prev = reg.agents[meta.id];
+    reg.agents[meta.id] = {
+      ...prev,
+      id: meta.id,
+      name: meta.name,
+      provider: 'lab',
+      role: meta.role,
+      capabilities: meta.capabilities ?? prev?.capabilities ?? [],
+      cwd: meta.cwd,
+      ...(meta.isGod ? { isGod: true } : {}),
+      status: prev?.status ?? 'idle',
+      cwdValid: true,
+      archived: false,
+      lastSeen: Date.now()
+    };
+    if (meta.isGod) reg.godId = meta.id;
+    this.atomicWriteJson(join(root, 'registry.json'), reg);
+    this.appendLog({ kind: 'spawn', agentId: meta.id, name: meta.name, isGod: !!meta.isGod, provider: 'lab' });
+    this.commit(`hive: register ${meta.id}`);
+  }
+
+  /** Replace one marker-fenced section of board.md (shared/managedSection.ts), leaving the rest untouched. Returns whether the file changed. */
+  writeBoardSection(name: string, markdown: string): boolean {
+    const root = this.root();
+    if (!root) return false;
+    this.ensureHive();
+    const file = join(root, 'board.md');
+    const current = existsSync(file) ? readFileSync(file, 'utf8') : null;
+    const next = upsertManagedSection(current, name, markdown, '# Hive board\n\n_Shared plans live here. The god agent is the scribe._\n');
+    if (next === current) return false;
+    writeFileSync(file, next, 'utf8');
+    this.commit(`hive: board ${name}`);
+    return true;
+  }
+
+  /** Append `line` to the hive's .gitignore when missing (the lab control file holds a token and must never be committed). */
+  ensureGitignored(line: string): void {
+    const root = this.root();
+    if (!root) return;
+    const gitignore = join(root, '.gitignore');
+    let lines: string[] = [];
+    if (existsSync(gitignore)) { try { lines = readFileSync(gitignore, 'utf8').split('\n'); } catch { lines = []; } }
+    if (lines.includes(line)) return;
+    try { writeFileSync(gitignore, [...lines.filter(Boolean), line].join('\n') + '\n', 'utf8'); } catch { /* best-effort */ }
   }
 
   /**

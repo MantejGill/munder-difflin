@@ -68,6 +68,7 @@ import { WorkerWakeWatchdog, type WorkerWakeFacts } from './workerWake';
 import { inboxNudgeText } from '../shared/hiveNudge';
 import { resolveGodName } from '../shared/godIdentity';
 import { selectOrphansToArchive } from '../shared/orphanedAgents';
+import { createLabHost } from './labHost';
 import { fetchHireManifest, readHireManifestFiles } from './hire';
 import { parseHireDeepLink, type HireManifest } from '../shared/hire';
 import { ClosingTimeController } from './closingTime';
@@ -313,6 +314,17 @@ const hookServer = new HookServer(
   standingGoalFromRoster,
   (agentId, event, message) => workerWake.noteHook(agentId, event, message)
 );
+// Lab mode (off unless config `lab.enabled` or MD_LAB_CONTROL=1): the loopback control server a research lab
+// drives the office through, and the PTY-less god seat. Inert otherwise; see src/main/labHost.ts.
+const labHost = createLabHost({
+  hive,
+  readLabConfig: () => readConfig().lab,
+  sendToRenderer: (channel, payload) => {
+    const wc = liveWebContents();
+    if (!wc) return;
+    try { wc.send(channel, payload); } catch { /* window torn down */ }
+  }
+});
 const memory = new MemoryManager(
   () => readConfig().harnessHome,
   () => { const c = readConfig(); return { enabled: c.semanticMemory !== false, model: c.embeddingModel ?? 'minilm' }; }
@@ -3276,6 +3288,7 @@ ipcMain.handle('config:changeHome', async (_evt, payload: unknown) => {
   try { integrationBroker.stop(); } catch (e) { console.error('[changeHome] broker.stop:', e); }
   try { hive.stopRouter(); } catch (e) { console.error('[changeHome] stopRouter:', e); }
   try { hookServer.stop(); } catch (e) { console.error('[changeHome] hookServer.stop:', e); }
+  try { labHost.stop(); } catch (e) { console.error('[changeHome] labHost.stop:', e); }
   try { stopSlackServer(); } catch (e) { console.error('[changeHome] slack.stop:', e); }
   try { stopWebhookServer(); } catch (e) { console.error('[changeHome] webhook.stop:', e); }
   try { memory.stop(); } catch (e) { console.error('[changeHome] memory.stop:', e); }
@@ -3468,6 +3481,23 @@ ipcMain.handle('roster:read', () => roster.read());
 ipcMain.handle('roster:write', (_evt, snap: unknown) => roster.write(snap));
 
 // ─── IPC: hive (multi-agent coordination) ───────────────────────────────────
+// ─── IPC: lab mode (inert unless lab mode is on) ─────────────────────────────
+ipcMain.handle('lab:config', () => {
+  const m = labHost.mode();
+  return { enabled: m.enabled, godId: m.godId, godName: m.godName, godRole: m.godRole, godPrompt: m.godPrompt };
+});
+ipcMain.handle('lab:state', () => labHost.state());
+ipcMain.handle('lab:progress', () => labHost.progress());
+ipcMain.handle('lab:approve', (_evt, gateId: unknown, answer: unknown) => {
+  if (gateId !== undefined && gateId !== null && (typeof gateId !== 'string' || !gateId)) return { ok: false, error: 'invalid gate id' };
+  const text = typeof answer === 'string' && answer.trim() ? answer.trim().slice(0, 2000) : 'approved';
+  return { ok: true, approved: labHost.approve(typeof gateId === 'string' ? gateId : undefined, text) };
+});
+ipcMain.handle('lab:pause', (_evt, paused: unknown) => {
+  if (typeof paused !== 'boolean') return { ok: false, error: 'invalid pause flag' };
+  const state = labHost.setPaused(paused);
+  return state ? { ok: true, state } : { ok: false, error: 'lab control is not running' };
+});
 ipcMain.handle('hive:registry', () => hive.registry());
 ipcMain.handle('hive:renameAgent', (_evt, id: unknown, name: unknown) => {
   if (typeof id !== 'string' || typeof name !== 'string') {
@@ -3776,6 +3806,7 @@ function teardownAndQuit(): void {
   try { integrationBroker.stop(); } catch (e) { console.error('[quit] broker.stop:', e); }
   try { hive.stopRouter(); } catch (e) { console.error('[quit] stopRouter:', e); }
   try { hookServer.stop(); } catch (e) { console.error('[quit] hookServer.stop:', e); }
+  try { labHost.stop(); } catch (e) { console.error('[quit] labHost.stop:', e); }
   try { telemetry.stop(); } catch (e) { console.error('[quit] telemetry.stop:', e); }
   try { stopSlackServer(); } catch (e) { console.error('[quit] slack.stop:', e); }
   try { stopWebhookServer(); } catch (e) { console.error('[quit] webhook.stop:', e); }
@@ -3837,6 +3868,7 @@ ipcMain.handle('app:resetAll', () => {
   try { integrationBroker.stop(); } catch (e) { console.error('[reset] broker.stop:', e); }
   try { hive.stopRouter(); } catch (e) { console.error('[reset] stopRouter:', e); }
   try { hookServer.stop(); } catch (e) { console.error('[reset] hookServer.stop:', e); }
+  try { labHost.stop(); } catch (e) { console.error('[reset] labHost.stop:', e); }
   try { telemetry.stop(); } catch (e) { console.error('[reset] telemetry.stop:', e); }
   try { stopSlackServer(); } catch (e) { console.error('[reset] slack.stop:', e); }
   try { memory.stop(); } catch (e) { console.error('[reset] memory.stop:', e); }
@@ -5108,6 +5140,10 @@ function bootstrapHiveServices(): void {
   // reply still belongs in the history.
   if ((readConfig().webhookTriggers ?? []).length > 0) startWebhookDoneObserver();
   hookServer.start();
+  void labHost.start().then((r) => {
+    if (r.ok) console.log('[lab] control server listening on 127.0.0.1:' + r.port);
+    else if (labHost.mode().enabled) console.error('[lab] control server failed to start:', r.error);
+  });
   // Bind the telemetry collector BEFORE the renderer spawns any agent, then point
   // the hive at it so every subsequent spawn is instrumented. Best-effort — a bind
   // failure just leaves telemetry off (transcript reconciler stays). No breaker.start():

@@ -10,6 +10,7 @@ import {
   type AgentProvider
 } from '../shared/agentProvider';
 import { defaultMcpDefaults } from '../shared/mcpCatalog';
+import type { LabConfigInput } from '../shared/labMode';
 import { MAX_AGENT_TOKEN_CAP } from '../shared/tokenCaps';
 import { expandTilde, normalizeHiveHome } from './fs';
 import type { IntegrationRecord } from '../shared/integrations';
@@ -211,6 +212,10 @@ export interface HarnessConfig {
   /** The model GOD runs on. Unset falls back to the provider preset's
    *  `recommendedOrchestratorModel`, then MODEL_GOD. Default 'claude-opus-4-8'. */
   godModel?: string;
+  /** Lab mode: the app as the live office of a research lab. Absent/disabled = the app behaves as always. When enabled
+   *  (or MD_LAB_CONTROL=1) the loopback lab control server runs and the god seat is a PTY-less orchestrator named from
+   *  here (default "Dwight") instead of a Claude CLI. See src/shared/labMode.ts. */
+  lab?: LabConfigInput;
   /** Per-server consent state for the default MCP bundle, keyed by catalog id.
    *  Seeded from MCP_CATALOG (safe-readonly ON, write/secret OFF); the user flips
    *  these in Settings. A server is wired into an agent only when enabled here. */

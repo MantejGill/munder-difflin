@@ -23,6 +23,7 @@ import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { chmodSync, mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { LabMode } from '../shared/labMode';
+import type { LabGateState, LabPhase, LabStateView } from '../shared/labProgress';
 import {
   validateAgentSpec, validateApprove, validateBoard, validateCost, validateGate, validateLog, validateMessage,
   validatePause, validateProgress, validateStart, validateStatus, validateTask, validateTaskPatch,
@@ -59,29 +60,7 @@ export const LAB_ROUTES: ReadonlyArray<{ method: 'GET' | 'POST' | 'PATCH' | 'DEL
   { method: 'POST', path: '/lab/log', summary: 'append an event to log.jsonl' }
 ];
 
-export type LabPhase = 'idle' | 'running' | 'paused';
-
-export interface LabGateState {
-  id: string;
-  kind: string;
-  title: string;
-  question: string;
-  cardId: string;
-  status: 'pending' | 'approved';
-  raisedAt: string;
-  answer?: string;
-  approvedAt?: string;
-}
-
-export interface LabStateView {
-  phase: LabPhase;
-  campaign: string | null;
-  startedAt: string | null;
-  god: { id: string; name: string; role: string; prompt: string };
-  gates: LabGateState[];
-  pendingGates: number;
-  progressRound: number | null;
-}
+export type { LabPhase, LabGateState, LabStateView } from '../shared/labProgress';
 
 /** A cumulative cost row for one agent (what the ledger and the cost gauge want). */
 export interface LabCostRow {

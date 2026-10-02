@@ -76,6 +76,8 @@ export interface HarnessConfig {
    *  'claude' / 'claude-opus-4-8'. Mirrors src/main/config.ts. */
   godProvider?: AgentProvider;
   godModel?: string;
+  /** Lab mode (mirrors src/main/config.ts): the PTY-less god seat and the lab tab. */
+  lab?: { enabled?: boolean; godName?: string; godRole?: string; godPrompt?: string };
   /** Per-server consent for the default MCP bundle, keyed by catalog id (mirrors
    *  src/main/config.ts; seeded from MCP_CATALOG). */
   mcpDefaults?: { [id: string]: { enabled: boolean } };
